@@ -1,0 +1,9 @@
+# The actual analytics
+networkx
+python-igraph
+pandas
+numpy
+scipy
+# CLI
+click
+yaspin
