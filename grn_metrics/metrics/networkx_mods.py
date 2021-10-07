@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 
 from ..utils import progressbar
-from .random_nets import make_equiv_ER
+from .reference_nets import gen_degree_preserving_network, gen_er_network
 
 
 def sigma(G, niter=100, nrand=10, seed=None):
@@ -18,7 +18,7 @@ def sigma(G, niter=100, nrand=10, seed=None):
     randMetrics = {"C": [], "L": []}
     with progressbar(range(nrand), label="Computing small-worldness...") as random_nets:
         for _ in random_nets:
-            Gr = make_equiv_ER(len(G.nodes()), len(G.edges()))  # HACK
+            Gr = gen_er_network(G)  # HACK
             randMetrics["C"].append(nx.transitivity(Gr))
             randMetrics["L"].append(nx.average_shortest_path_length(Gr))
 
@@ -43,9 +43,7 @@ def rich_club_coefficient(graph, Q = 100, n_rand = 100, seed = None):
         rcran_sum[degree] = 0
     with progressbar(range(n_rand), label="Calculating Rich Club Coefficient...") as reference_nets:
         for _ in reference_nets:
-            R = graph.copy()
-            E = R.number_of_edges()
-            nx.double_edge_swap(R, Q * E, max_tries=Q * E * 10, seed=seed)
+            R = gen_degree_preserving_network(graph, Q, seed)
             rcran = _compute_RC(R)
             for ran_deg, ran_rcc in rcran.items():
                 rcran_sum[ran_deg] += ran_rcc

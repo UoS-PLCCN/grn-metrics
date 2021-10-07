@@ -1,14 +1,19 @@
 import glob
 import pickle
 from pathlib import Path
-from typing import Union
+from typing import Callable, Union
 
 import click
 import networkx as nx
+import numpy as np
 import pandas as pd
 from yaspin import yaspin
 
 from grn_metrics.metrics import centrality, communities
+from grn_metrics.metrics.reference_nets import (gen_degree_preserving_network,
+                                                gen_er_network)
+from grn_metrics.utils import get_confidence_interval, progressbar
+from grn_metrics.visualization import draw_network
 
 
 def _get_networks() -> list[Path]:
@@ -63,41 +68,118 @@ def community_calculation(network: nx.Graph):
         click.echo(click.style(f"Community {i + 1}: ", bold=True) + ", ".join(list(community)))
 
 
-@metrics.command("clustering")
-@click.argument("network", callback=validate_network)
-def clustering_metrics(network: nx.Graph):
-    with yaspin(text="Computing Modularity", color="green") as spinner:
-        modularity = communities.get_modularity(network)
-        spinner.ok()
+REFERENCE_NET_GENERATORS = {
+    "ER": gen_er_network,
+    "RandomDegreePreserving": gen_degree_preserving_network
+}
+REFERENCE_NET_CHOICES = list(REFERENCE_NET_GENERATORS.keys()) + ["all"]
 
-    with yaspin(text="Computing Global Clustering Coefficient", color="green") as spinner:
-        global_clustering_coefficient = communities.get_global_clustering_coefficient(network)
+
+def _process_compare(ctx: click.core.Context, param: click.core.Argument, value: str) -> list[str]:
+    if not value:
+        return []
+    
+    return [value] if value != "all" else REFERENCE_NET_GENERATORS.keys()
+
+
+def _compute_reference_nets(network: nx.Graph, compare: str, comparison_network_n: int) -> dict:
+    ret = {}
+    for reference_network_type in compare:
+        reference_networks = []
+        with progressbar(range(comparison_network_n), label=f"Generating {reference_network_type} networks...") as reference_networks_n:
+            for _ in reference_networks_n:
+                reference_networks.append(REFERENCE_NET_GENERATORS[reference_network_type](network))
+        ret[reference_network_type] = reference_networks
+    click.echo("\n", nl=False)
+    return ret
+
+
+def _get_metric_stats(
+    network: nx.Graph, function: Callable, metric_name: str,
+    reference_networks: dict, confidence_level: float = 0.95
+):
+    with yaspin(text=f"Computing {metric_name}", color="green") as spinner:
+        metric = function(network)
         spinner.ok()
     
-    with yaspin(text="Get Average Clustering", color="green") as spinner:
-        average_clustering = communities.get_average_clustering(network)
-        spinner.ok()
+    ret = {
+        "value": metric
+    }
+
+    for reference_network_type, reference_net_list in reference_networks.items():  # This could be empty, btw.
+        n = len(reference_net_list)
+        recorded_values = np.zeros(n)
+        with progressbar(range(n), f" - Computing {metric_name} for {reference_network_type} networks...") as _reference_networks:
+            for i in _reference_networks:
+                recorded_values[i] = function(reference_net_list[i])
+        mean = np.mean(recorded_values)
+        std = np.std(recorded_values)
+        confidence_interval = get_confidence_interval(mean, std, len(recorded_values), confidence_level=confidence_level)
+        ret[reference_network_type] = {
+            "mean": mean, "std": std, "confidence_interval": confidence_interval
+        }
+    click.echo("\n", nl=False)
+    
+    return ret
+
+def _print_metric_stats(stats: dict, metric_name: str, compare: list[str]):
+    click.echo(f"{metric_name}: " + click.style(stats["value"], fg="green"))
+    for reference_network_type in compare:
+        click.echo(f"- {reference_network_type}:")
+        click.echo(f"- - Mean value: {click.style(stats[reference_network_type]['mean'], fg='green')}")
+        click.echo(f"- - Standard Deviation: {click.style(stats[reference_network_type]['std'], fg='green')}")
+        click.echo(f"- - Confidence Interval: ±{click.style(stats[reference_network_type]['confidence_interval'], fg='green')}")
+    click.echo("\n", nl=False)
+
+
+@metrics.command("clustering")
+@click.argument("network", callback=validate_network)
+@click.option(
+    "-c", "--compare",
+    type=click.Choice(REFERENCE_NET_CHOICES, case_sensitive=False),
+    callback=_process_compare,
+    help="The type of network(s) to compare against. All chooses all of them."
+)
+@click.option(
+    "-cn", "--comparison-network-n", type=click.IntRange(2, 1000), default=1000, help="The number of reference networks to generate."
+)
+@click.option("-cf", "--confidence-level", type=float, default=0.95, help="The confidence interval %.")
+def clustering_metrics(network: nx.Graph, compare: list[str], comparison_network_n: int, confidence_level: float):
+    _reference_networks = _compute_reference_nets(network, compare, comparison_network_n)
+    modularity_stats = _get_metric_stats(network, communities.get_modularity, "Modularity", _reference_networks, confidence_level)
+    global_clustering_coefficient_stats = _get_metric_stats(
+        network, communities.get_global_clustering_coefficient, "Global Clustering Coefficient", _reference_networks, confidence_level
+    )
+    average_clustering_stats = _get_metric_stats(
+        network, communities.get_average_clustering, "Average Clustering", _reference_networks, confidence_level
+    )
 
     click.echo("\n", nl=False)
-    click.echo("Modularity: " + click.style(modularity, fg="green"))
-    click.echo("Global Clustering Coefficient: " + click.style(global_clustering_coefficient, fg="green"))
-    click.echo("Average Clustering: " + click.style(average_clustering, fg="green"))
+    _print_metric_stats(modularity_stats, "Modularity", compare)
+    _print_metric_stats(global_clustering_coefficient_stats, "Global Clustering Coefficient", compare)
+    _print_metric_stats(average_clustering_stats, "Average Clustering", compare)
 
 
 @metrics.command("degree-metrics")
 @click.argument("network", callback=validate_network)
-def degree_metrics(network: nx.Graph):
-    with yaspin(text="Computing Average Degree", color="green") as spinner:
-        average_degree = centrality.get_average_degree(network)
-        spinner.ok()
-
-    with yaspin(text="Computing Characteristic Path Length", color="green") as spinner:
-        characteristic_path_length = centrality.get_characteristic_path_length(network)
-        spinner.ok()
+@click.option(
+    "-c", "--compare",
+    type=click.Choice(REFERENCE_NET_CHOICES, case_sensitive=False),
+    callback=_process_compare,
+    help="The type of network(s) to compare against. All chooses all of them."
+)
+@click.option(
+    "-cn", "--comparison-network-n", type=click.IntRange(2, 1000), default=1000, help="The number of reference networks to generate."
+)
+@click.option("-cf", "--confidence-level", type=float, default=0.95, help="The confidence interval %.")
+def degree_metrics(network: nx.Graph, compare: list[str], comparison_network_n: int, confidence_level: float):
+    _reference_networks = _compute_reference_nets(network, compare, comparison_network_n)
+    average_degree_stats = _get_metric_stats(network, centrality.get_average_degree, "Average Degree", _reference_networks, confidence_level)
+    characteristic_path_length_stats = _get_metric_stats(network, centrality.get_characteristic_path_length, "Characteristic Path Length", _reference_networks, confidence_level)
 
     click.echo("\n", nl=False)
-    click.echo("Average Degree" + click.style(average_degree, fg="green"))
-    click.echo("Characteristic Path Length: " + click.style(characteristic_path_length, fg="green"))
+    _print_metric_stats(average_degree_stats, "Average Degree", compare)
+    _print_metric_stats(characteristic_path_length_stats, "Characteristic Path Length", compare)
 
 
 @metrics.command("rich-club-coefficient")
@@ -133,6 +215,15 @@ def centrality_metrics(network: nx.Graph, output: click.Path):
     _metrics.to_csv(output, index=False)
     click.echo(f"Exported the centrality metrics to: " + click.style(output, fg="green"))
 
+
+@metrics.command("visualize")
+@click.argument("network", callback=validate_network)
+@click.option("-c", "--colours", type=click.Choice(["Communities"]), default=None, help="The colouring of the nodes in the graph.")
+@click.option("-o", "--output", type=click.Path(), help="The path to the output image.")
+def visualize(network: nx.Graph, colours: str = None, output: Path = None):
+    with yaspin(text="Visualizing the network...", color="green") as spinner:
+        draw_network(network, colours == "Communities", output)
+        spinner.ok()
 
 if __name__ == "__main__":
     metrics()

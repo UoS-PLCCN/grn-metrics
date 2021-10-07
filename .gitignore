@@ -140,3 +140,4 @@ cython_debug/
 # Editor
 .vscode
 **/.DS_Store
+*.txt

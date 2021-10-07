@@ -6,7 +6,7 @@ from ..utils import force_undirected
 from .networkx_mods import rich_club_coefficient, sigma
 
 
-def get_centrality_metrics(network: nx.Graph) -> pd.Dataframe:
+def get_centrality_metrics(network: nx.Graph) -> pd.DataFrame:
     iNet = Graph.Adjacency((nx.to_numpy_matrix(network) > 0).tolist())
     cent_mat = pd.DataFrame()
     cent_mat['Names'] = network.nodes()
