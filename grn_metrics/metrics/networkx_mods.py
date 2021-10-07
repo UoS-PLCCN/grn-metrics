@@ -16,11 +16,12 @@ def sigma(G, niter=100, nrand=10, seed=None):
     Mod: use an ER reference network instead of a random one.
     """
     randMetrics = {"C": [], "L": []}
-    with progressbar(range(nrand), label="Computing small-worldness...") as random_nets:
-        for _ in random_nets:
-            Gr = gen_er_network(G)  # HACK
-            randMetrics["C"].append(nx.transitivity(Gr))
-            randMetrics["L"].append(nx.average_shortest_path_length(Gr))
+    # with progressbar(range(nrand), label="Computing small-worldness...") as random_nets:
+    random_nets = range(nrand)
+    for _ in random_nets:
+        Gr = gen_er_network(G)  # HACK
+        randMetrics["C"].append(nx.transitivity(Gr))
+        randMetrics["L"].append(nx.average_shortest_path_length(Gr))
 
     C = nx.transitivity(G)
     L = nx.average_shortest_path_length(G)

@@ -1,3 +1,4 @@
+import functools
 import glob
 import pickle
 from pathlib import Path
@@ -36,36 +37,6 @@ def validate_network(ctx: click.core.Context, param: click.core.Argument, value:
         GRN = pickle.load(f)
     
     return GRN
-
-
-@click.group()
-def metrics():
-    pass
-
-
-@metrics.command("small-worldness")
-@click.argument("network", callback=validate_network)
-def small_worldness(network: nx.Graph):
-    """
-    Get the small worldness of a network.
-    """
-    _small_worldness = centrality.small_worldness(network)
-    click.echo(f"Small-worldness: " + click.style(_small_worldness, fg="green"))
-
-
-@metrics.command("communities")
-@click.argument("network", callback=validate_network)
-def community_calculation(network: nx.Graph):
-    """
-    Get the different communities in the network.
-    """
-    with yaspin(text="Computing communities", color="green") as spinner:
-        network_communities = communities.get_communities(network)
-        spinner.ok()
-
-    click.echo("\n", nl=False)
-    for i, community in enumerate(network_communities):
-        click.echo(click.style(f"Community {i + 1}: ", bold=True) + ", ".join(list(community)))
 
 
 REFERENCE_NET_GENERATORS = {
@@ -132,18 +103,60 @@ def _print_metric_stats(stats: dict, metric_name: str, compare: list[str]):
     click.echo("\n", nl=False)
 
 
+@click.group()
+def metrics():
+    pass
+
+
+def comparison_params(func: Callable):
+    @click.option(
+        "-c", "--compare",
+        type=click.Choice(REFERENCE_NET_CHOICES, case_sensitive=False),
+        callback=_process_compare,
+        help="The type of network(s) to compare against. All chooses all of them."
+    )
+    @click.option(
+        "-cn", "--comparison-network-n", type=click.IntRange(2, 1000), default=1000, help="The number of reference networks to generate."
+    )
+    @click.option("-cf", "--confidence-level", type=float, default=0.95, help="The confidence interval %.")
+    # @click.option("-v", "--visualize", type=click.Path(), help="Path to save comparison visualization to.")
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+
+
+@metrics.command("small-worldness")
+@click.argument("network", callback=validate_network)
+@comparison_params
+def small_worldness(network: nx.Graph, compare: list[str], comparison_network_n: int, confidence_level: float, visualize: Path = None):
+    """
+    Get the small worldness of a network.
+    """
+    _reference_networks = _compute_reference_nets(network, compare, comparison_network_n)
+    small_worldness_stats = _get_metric_stats(network, centrality.small_worldness, "Small-worldness", _reference_networks, confidence_level)
+    _print_metric_stats(small_worldness_stats, "Small-worldness", compare)
+
+
+@metrics.command("communities")
+@click.argument("network", callback=validate_network)
+def community_calculation(network: nx.Graph):
+    """
+    Get the different communities in the network.
+    """
+    with yaspin(text="Computing communities", color="green") as spinner:
+        network_communities = communities.get_communities(network)
+        spinner.ok()
+
+    click.echo("\n", nl=False)
+    for i, community in enumerate(network_communities):
+        click.echo(click.style(f"Community {i + 1}: ", bold=True) + ", ".join(list(community)))
+
+
 @metrics.command("clustering")
 @click.argument("network", callback=validate_network)
-@click.option(
-    "-c", "--compare",
-    type=click.Choice(REFERENCE_NET_CHOICES, case_sensitive=False),
-    callback=_process_compare,
-    help="The type of network(s) to compare against. All chooses all of them."
-)
-@click.option(
-    "-cn", "--comparison-network-n", type=click.IntRange(2, 1000), default=1000, help="The number of reference networks to generate."
-)
-@click.option("-cf", "--confidence-level", type=float, default=0.95, help="The confidence interval %.")
+@comparison_params
 def clustering_metrics(network: nx.Graph, compare: list[str], comparison_network_n: int, confidence_level: float):
     _reference_networks = _compute_reference_nets(network, compare, comparison_network_n)
     modularity_stats = _get_metric_stats(network, communities.get_modularity, "Modularity", _reference_networks, confidence_level)
@@ -162,16 +175,7 @@ def clustering_metrics(network: nx.Graph, compare: list[str], comparison_network
 
 @metrics.command("degree-metrics")
 @click.argument("network", callback=validate_network)
-@click.option(
-    "-c", "--compare",
-    type=click.Choice(REFERENCE_NET_CHOICES, case_sensitive=False),
-    callback=_process_compare,
-    help="The type of network(s) to compare against. All chooses all of them."
-)
-@click.option(
-    "-cn", "--comparison-network-n", type=click.IntRange(2, 1000), default=1000, help="The number of reference networks to generate."
-)
-@click.option("-cf", "--confidence-level", type=float, default=0.95, help="The confidence interval %.")
+@comparison_params
 def degree_metrics(network: nx.Graph, compare: list[str], comparison_network_n: int, confidence_level: float):
     _reference_networks = _compute_reference_nets(network, compare, comparison_network_n)
     average_degree_stats = _get_metric_stats(network, centrality.get_average_degree, "Average Degree", _reference_networks, confidence_level)
