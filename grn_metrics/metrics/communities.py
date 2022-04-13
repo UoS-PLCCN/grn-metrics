@@ -1,8 +1,7 @@
 import networkx as nx
 from grn_metrics.utils import force_undirected
 from networkx.algorithms import cluster
-from networkx.algorithms.community import (greedy_modularity_communities,
-                                           modularity)
+from networkx.algorithms.community import greedy_modularity_communities, modularity
 
 
 def get_communities(xNet: nx.Graph) -> list:
@@ -29,8 +28,9 @@ def get_global_clustering_coefficient(xNet: nx.Graph) -> float:
     triangles = cluster.triangles(xNet)
     n_vertices = len(triangles)
     n_existing_triangles = sum(triangles.values()) / 3
-    n_possible_triangles = (n_vertices * (n_vertices-1) * (n_vertices-2)) / 6
+    n_possible_triangles = (n_vertices * (n_vertices - 1) * (n_vertices - 2)) / 6
     return n_existing_triangles / n_possible_triangles
+
 
 def get_average_clustering(xNet: nx.Graph) -> float:
     return nx.algorithms.cluster.average_clustering(xNet)

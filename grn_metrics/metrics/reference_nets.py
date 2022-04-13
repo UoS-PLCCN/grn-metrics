@@ -27,7 +27,9 @@ def gen_er_network(graph: nx.Graph) -> nx.DiGraph:
         i = np.random.randint(n_nodes)
         j = np.random.randint(n_nodes)
         G.add_edge(i, j)
-    while not nx.is_connected(G): #lots of garbage to make sure it's actually connected
+    while not nx.is_connected(
+        G
+    ):  # lots of garbage to make sure it's actually connected
         edges = G.edges()
         edge_to_bin = random.choice(list(edges))
         G.remove_edge(edge_to_bin[0], edge_to_bin[1])
@@ -43,7 +45,10 @@ def gen_er_network(graph: nx.Graph) -> nx.DiGraph:
         G.add_edge(i, j)
     return G
 
-def gen_degree_preserving_network(graph: nx.Graph, Q: int = 100, seed: int = None) -> nx.Graph:
+
+def gen_degree_preserving_network(
+    graph: nx.Graph, Q: int = 100, seed: int = None
+) -> nx.Graph:
     graph = force_undirected(graph)
     R = graph.copy()
     E = R.number_of_edges()

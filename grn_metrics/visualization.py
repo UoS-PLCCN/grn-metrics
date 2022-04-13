@@ -11,8 +11,8 @@ from grn_metrics.metrics.communities import get_communities
 
 def _get_fig() -> tuple[Figure, object]:
     # No colours, WARNING: Super resolution, downscale after export
-    fig = plt.figure(figsize=(25,18), dpi=1000)
-    ax = fig.add_subplot(1,1,1)
+    fig = plt.figure(figsize=(25, 18), dpi=1000)
+    ax = fig.add_subplot(1, 1, 1)
     return (fig, ax)
 
 
@@ -32,13 +32,18 @@ def draw_network(graph: nx.Graph, community_colours: bool = False, output: Path 
         "node_color": "lightblue",
         "linewidths": 0.25,
         "font_size": 12,
-        "ax": ax
+        "ax": ax,
     }
 
     if community_colours:
         # Community colours, WARNING: Super resolution, downscale after export
         communities = [list(community) for community in get_communities(graph)]
-        community_series = [i + 1 for node in graph for i, community in enumerate(communities) if node in community]
+        community_series = [
+            i + 1
+            for node in graph
+            for i, community in enumerate(communities)
+            if node in community
+        ]
         colors = plt.get_cmap("Set3").colors
         node_colors = [colors[value - 1] for value in community_series]
         kwargs["node_color"] = node_colors
@@ -49,7 +54,7 @@ def draw_network(graph: nx.Graph, community_colours: bool = False, output: Path 
         xy=(0, 0.5),
         xycoords="axes fraction",
         va="center",
-        fontsize=12
+        fontsize=12,
     )
 
     if not output:

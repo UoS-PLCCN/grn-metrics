@@ -33,7 +33,7 @@ def sigma(G, niter=100, nrand=10, seed=None):
     return sigma
 
 
-def rich_club_coefficient(graph, Q = 100, n_rand = 100, seed = None):
+def rich_club_coefficient(graph, Q=100, n_rand=100, seed=None):
     """
     Original: https://networkx.org/documentation/stable/_modules/networkx/algorithms/richclub.html#rich_club_coefficient
     Mod: Use the average of `n_rand` degree-preserving random graphs as the reference instead of just 1.
@@ -42,14 +42,16 @@ def rich_club_coefficient(graph, Q = 100, n_rand = 100, seed = None):
     rcran_sum = {}
     for degree, _ in rc_raw.items():
         rcran_sum[degree] = 0
-    with progressbar(range(n_rand), label="Calculating Rich Club Coefficient...") as reference_nets:
+    with progressbar(
+        range(n_rand), label="Calculating Rich Club Coefficient..."
+    ) as reference_nets:
         for _ in reference_nets:
             R = gen_degree_preserving_network(graph, Q, seed)
             rcran = _compute_RC(R)
             for ran_deg, ran_rcc in rcran.items():
                 rcran_sum[ran_deg] += ran_rcc
     for degree, rcc in rcran_sum.items():
-        rcran_sum[degree] = rcc/n_rand
+        rcran_sum[degree] = rcc / n_rand
     rcc_norm = {}
     for degree, rcc in rc_raw.items():
         rcc_norm[degree] = rcc / rcran_sum[degree]
@@ -66,7 +68,9 @@ def _compute_RC(graph):
 
     nks = (total - cs for cs in accumulate(deghist) if total - cs > 1)
 
-    edge_degrees = sorted((sorted(map(graph.degree, e)) for e in graph.edges()), reverse=True)
+    edge_degrees = sorted(
+        (sorted(map(graph.degree, e)) for e in graph.edges()), reverse=True
+    )
     ek = graph.number_of_edges()
     k1, k2 = edge_degrees.pop()
     rc = {}
