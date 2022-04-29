@@ -10,3 +10,6 @@ yaspin
 # Visualization
 matplotlib
 pydot
+# Notebook
+ipywidgets
+plotly

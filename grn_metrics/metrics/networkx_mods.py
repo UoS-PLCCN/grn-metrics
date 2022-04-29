@@ -58,20 +58,23 @@ def rich_club_coefficient(graph, Q=100, n_rand=100, seed=None):
     return rcc_norm
 
 
-def _compute_RC(graph):
+def _compute_RC(G):
     """
     Original: https://networkx.org/documentation/stable/_modules/networkx/algorithms/richclub.html#rich_club_coefficient
     Mod: none
     """
-    deghist = nx.degree_histogram(graph)
+    deghist = nx.degree_histogram(G)
     total = sum(deghist)
-
+    # Compute the number of nodes with degree greater than `k`, for each
+    # degree `k` (omitting the last entry, which is zero).
     nks = (total - cs for cs in accumulate(deghist) if total - cs > 1)
-
-    edge_degrees = sorted(
-        (sorted(map(graph.degree, e)) for e in graph.edges()), reverse=True
-    )
-    ek = graph.number_of_edges()
+    # Create a sorted list of pairs of edge endpoint degrees.
+    #
+    # The list is sorted in reverse order so that we can pop from the
+    # right side of the list later, instead of popping from the left
+    # side of the list, which would have a linear time cost.
+    edge_degrees = sorted((sorted(map(G.degree, e)) for e in G.edges()), reverse=True)
+    ek = G.number_of_edges()
     k1, k2 = edge_degrees.pop()
     rc = {}
     for d, nk in enumerate(nks):

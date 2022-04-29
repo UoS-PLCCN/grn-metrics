@@ -328,11 +328,11 @@ def rich_club_coefficient(network: nx.Graph, output: click.Path, n_rand: int):
         click.echo("Degree: Normalized Value")
         click.echo("------------------------")
         for degree, coefficient in rcc.items():
-            click.echo(f"{degree + 1}: {coefficient}")
+            click.echo(f"{degree}: {coefficient}")
     else:
         pd.DataFrame(
             {
-                "Degree": [degree + 1 for degree in rcc],
+                "Degree": [degree for degree in rcc],
                 "Normalized Rich Club Coefficient Value": [
                     coefficient for _, coefficient in rcc.items()
                 ],

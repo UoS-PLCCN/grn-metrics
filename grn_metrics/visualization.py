@@ -57,7 +57,6 @@ def draw_network(graph: nx.Graph, community_colours: bool = False, output: Path 
         fontsize=12,
     )
 
-    if not output:
-        output = Path(f"grn_vis{'_community_colours' if community_colours else ''}.png")
-
-    plt.savefig(output, dpi=1000, bbox_inches="tight")
+    if output:
+        # output = Path(f"grn_vis{'_community_colours' if community_colours else ''}.png")
+        plt.savefig(output, dpi=1000, bbox_inches="tight")
